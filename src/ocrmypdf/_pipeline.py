@@ -956,8 +956,8 @@ def enumerate_compress_ranges(iterable):
         yield (skipped_from, index), None
 
 
-def merge_sidecars(txt_files: Iterable[Path | None], context: PdfContext) -> Path:
-    output_file = context.get_path('sidecar.txt')
+def merge_extra_files(txt_files: Iterable[Path | None], context: PdfContext, filename: str) -> Path:
+    output_file = context.get_path(filename)
     with open(output_file, 'w', encoding="utf-8") as stream:
         for (from_, to_), txt_file in enumerate_compress_ranges(txt_files):
             if from_ != 1:

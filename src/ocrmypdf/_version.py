@@ -13,4 +13,4 @@ from importlib.metadata import version as _package_version
 PROGRAM_NAME = 'ocrmypdf'
 
 # Official PEP 396
-__version__ = _package_version('ocrmypdf')
+__version__ = "1.0"
