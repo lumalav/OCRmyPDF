@@ -80,7 +80,7 @@ class PageContext:
         self.pageno = pageno
         self.pageinfo = pdf_context.pdfinfo[pageno]
         self.plugin_manager = pdf_context.plugin_manager
-        self.hocr_in = pdf_context.hocr_in
+        self.hocr_in = pdf_context.options.hocr_in
 
     def get_path(self, name: str) -> Path:
         """Generate a ``Path`` for a file that is part of processing this page.
