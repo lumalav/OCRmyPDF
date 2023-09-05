@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import argparse
 import logging
 import logging.handlers
@@ -29,6 +30,7 @@ from ocrmypdf._logging import PageNumberFilter
 from ocrmypdf._pipeline import (
     convert_to_pdfa,
     copy_final,
+    replace_image_in_hocr,
     create_ocr_image,
     create_pdf_page_from_image,
     create_visible_page_jpg,
@@ -79,6 +81,7 @@ class PageResult(NamedTuple):
     text: Path | None
     orientation_correction: int
     hocr: Path | None
+    ocr_image: Path | None
 
 
 tls = threading.local()
@@ -216,13 +219,15 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
 
     ocr_out: Path = None
     text_out: Path = None
+    ocr_image: Path = None
 
     if options.pdf_renderer.startswith('hocr'):
         if not page_context.hocr_in:
-            (hocr_out, text_out) = ocr_engine_hocr(ocr_image_out, page_context)
+            (hocr_out, text_out, ocr_image) = ocr_engine_hocr(ocr_image_out, page_context)
         if page_context.hocr_in:
+            ocr_image = page_context.get_path('ocr.png')
             hocr_out = page_context.hocr_in
-            ocr_out = render_hocr_page(hocr_out, page_context)
+            ocr_out = render_hocr_page(hocr_out, page_context, ocr_image)
         elif not options.ocr_only:
             ocr_out = render_hocr_page(hocr_out, page_context)
     elif options.pdf_renderer == 'sandwich':
@@ -238,6 +243,7 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
         hocr=hocr_out,
         text=text_out,
         orientation_correction=orientation_correction,
+        ocr_image=ocr_image
     )
 
 
@@ -271,6 +277,7 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
 
     sidecars: list[Path | None] = [None] * len(context.pdfinfo)
     hocrs: list[Path | None] = [None] * len(context.pdfinfo)
+    ocr_images: list[Path | None] = [None] * len(context.pdfinfo)
     ocrgraft = OcrGrafter(context)
 
     def update_page(result: PageResult, pbar):
@@ -278,6 +285,7 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
             tls.pageno = result.pageno + 1
             sidecars[result.pageno] = result.text
             hocrs[result.pageno] = result.hocr
+            ocr_images[result.pageno] = result.ocr_image
             pbar.update()
             ocrgraft.graft_page(
                 pageno=result.pageno,
@@ -312,9 +320,20 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
         copy_final(text, options.sidecar, context)
 
     if options.hocr_out:
+        #copy hocr to final location
         text = merge_extra_files(hocrs, context, 'hocr.txt')
-        # Copy text file to destination
         copy_final(text, options.hocr_out, context)
+
+        #copy image to final location
+        out_path = Path(options.hocr_out)
+        ext = out_path.suffix
+        parent = out_path.parent.absolute()
+        filename = out_path.name.replace(ext,'.png') if ext else out_path.name + '.png'
+        final_image_location = parent.joinpath(filename).absolute()
+        text = merge_extra_files(ocr_images, context, filename, None)
+        copy_final(text, final_image_location, context)
+
+        replace_image_in_hocr(options.hocr_out, filename)
 
     messages: Sequence[str] = []
 
