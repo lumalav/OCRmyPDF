@@ -82,6 +82,7 @@ class PageResult(NamedTuple):
     orientation_correction: int
     hocr: Path | None
     ocr_image: Path | None
+    tsv: Path | None
 
 
 tls = threading.local()
@@ -220,10 +221,11 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
     ocr_out: Path = None
     text_out: Path = None
     ocr_image: Path = None
+    tsv_out: Path = None
 
     if options.pdf_renderer.startswith('hocr'):
         if not page_context.hocr_in:
-            (hocr_out, text_out, ocr_image) = ocr_engine_hocr(ocr_image_out, page_context)
+            (hocr_out, text_out, ocr_image, tsv_out) = ocr_engine_hocr(ocr_image_out, page_context)
         if page_context.hocr_in:
             ocr_image = page_context.get_path('ocr.png')
             hocr_out = page_context.hocr_in
@@ -243,7 +245,8 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
         hocr=hocr_out,
         text=text_out,
         orientation_correction=orientation_correction,
-        ocr_image=ocr_image
+        ocr_image=ocr_image,
+        tsv=tsv_out
     )
 
 
@@ -277,6 +280,7 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
 
     sidecars: list[Path | None] = [None] * len(context.pdfinfo)
     hocrs: list[Path | None] = [None] * len(context.pdfinfo)
+    tsvs: list[Path | None] = [None] * len(context.pdfinfo)
     ocr_images: list[Path | None] = [None] * len(context.pdfinfo)
     ocrgraft = OcrGrafter(context)
 
@@ -285,6 +289,7 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
             tls.pageno = result.pageno + 1
             sidecars[result.pageno] = result.text
             hocrs[result.pageno] = result.hocr
+            tsvs[result.pageno] = result.tsv
             ocr_images[result.pageno] = result.ocr_image
             pbar.update()
             ocrgraft.graft_page(
@@ -334,6 +339,10 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
         copy_final(text, final_image_location, context)
 
         replace_image_in_hocr(options.hocr_out, filename)
+    
+    if options.tsv_out:
+        text = merge_extra_files(tsvs, context, 'hocr.tsv')
+        copy_final(text, options.tsv_out, context)
 
     messages: Sequence[str] = []
 

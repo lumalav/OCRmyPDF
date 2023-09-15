@@ -606,6 +606,7 @@ def create_ocr_image(image: Path, page_context: PageContext) -> Path:
 
 def ocr_engine_hocr(input_file: Path, page_context: PageContext) -> tuple[Path, Path]:
     hocr_out = page_context.get_path('ocr_hocr.hocr')
+    tsv_out = page_context.get_path('ocr_hocr.tsv')
     hocr_text_out = page_context.get_path('ocr_hocr.txt')
     ocr_image = page_context.get_path('ocr.png')
     options = page_context.options
@@ -617,7 +618,7 @@ def ocr_engine_hocr(input_file: Path, page_context: PageContext) -> tuple[Path, 
         output_text=hocr_text_out,
         options=options,
     )
-    return (hocr_out, hocr_text_out, ocr_image)
+    return (hocr_out, hocr_text_out, ocr_image, tsv_out)
 
 
 def should_visible_page_image_use_jpg(pageinfo: PageInfo) -> bool:

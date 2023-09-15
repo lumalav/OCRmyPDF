@@ -210,6 +210,21 @@ Online documentation is located at:
         "convenient way to preview OCR quality). The output file and sidecar "
         "may not both use stdout at the same time.",
     )
+    
+    parser.add_argument(
+        '--tsv-out',
+        nargs='?',
+        const='\0',
+        default=None,
+        metavar='FILE',
+        help="Generate tsv  files when pdf-renderer is set to hocr "
+        "by Tesseract. This may be useful for building a OCR text database. "
+        "If FILE is omitted, the hocr file be named {output_file}.tsv; the next "
+        "argument must NOT be the name of the input PDF. "
+        "If FILE is set to '-', the hocr is written to stdout (a "
+        "convenient way to preview OCR quality). The output file and hocr "
+        "may not both use stdout at the same time.",
+    )
 
     parser.add_argument(
         '--hocr-out',
