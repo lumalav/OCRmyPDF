@@ -1,0 +1,21 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["--rotate-pages", "--ocr-only", "--deskew", "--sidecar", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f75ef19e7985392fdfbc93-1.txt", "--hocr-out", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f75ef19e7985392fdfbc93-1.html", "--tsv-out", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f75ef19e7985392fdfbc93-1.tsv", "--pdf-renderer", "hocr", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f75ef19e7985392fdfbc93-1", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f75ef19e7985392fdfbc93-1.ocr"],
+            // "args": ["--rotate-pages", "--deskew", "--hocr-in", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f0d2bbdd22f200cc4cc288-1.html", "--pdf-renderer", "hocr", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f0d2bbdd22f200cc4cc288-1", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f0d2bbdd22f200cc4cc288-1-new2.pdf"],
+            // "args": ["--rotate-pages", "--deskew", "--pdf-renderer", "hocr", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f0d2bbdd22f200cc4cc288-1", "C:\\Users\\llavieri\\Desktop\\64efb2d325cd9142274dd9ea\\pdf\\64f0d2bbdd22f200cc4cc288-1-new.pdf"],
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}",
+            "env": {"PYTHONPATH": "${cwd}"
+        }
+    ]
+}
