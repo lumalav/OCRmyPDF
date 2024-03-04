@@ -210,6 +210,45 @@ Online documentation is located at:
         "convenient way to preview OCR quality). The output file and sidecar "
         "may not both use stdout at the same time.",
     )
+    
+    parser.add_argument(
+        '--tsv-out',
+        nargs='?',
+        const='\0',
+        default=None,
+        metavar='FILE',
+        help="Generate tsv  files when pdf-renderer is set to hocr "
+        "by Tesseract. This may be useful for building a OCR text database. "
+        "If FILE is omitted, the hocr file be named {output_file}.tsv; the next "
+        "argument must NOT be the name of the input PDF. "
+        "If FILE is set to '-', the hocr is written to stdout (a "
+        "convenient way to preview OCR quality). The output file and hocr "
+        "may not both use stdout at the same time.",
+    )
+
+    parser.add_argument(
+        '--hocr-out',
+        nargs='?',
+        const='\0',
+        default=None,
+        metavar='FILE',
+        help="Generate hocr text files when pdf-renderer is set to hocr "
+        "by Tesseract. This may be useful for building a OCR text database. "
+        "If FILE is omitted, the hocr file be named {output_file}.hocr; the next "
+        "argument must NOT be the name of the input PDF. "
+        "If FILE is set to '-', the hocr is written to stdout (a "
+        "convenient way to preview OCR quality). The output file and hocr "
+        "may not both use stdout at the same time.",
+    )
+
+    parser.add_argument(
+        '--hocr-in',
+        nargs='?',
+        const='\0',
+        default=None,
+        metavar='FILE',
+        help="when an hocr file is used as an argument, it can be used to generate the final file",
+    )
 
     parser.add_argument(
         '--version',
@@ -335,6 +374,12 @@ Online documentation is located at:
         action='store_true',
         help="Rasterize any text or vector objects on each page, apply OCR, and "
         "save the rastered output (this rewrites the PDF)",
+    )
+    ocrsettings.add_argument(
+        '-o',
+        '--ocr-only',
+        action='store_true',
+        help="Perform OCR step only",
     )
     ocrsettings.add_argument(
         '-s',

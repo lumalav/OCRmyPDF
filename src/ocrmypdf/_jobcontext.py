@@ -24,6 +24,7 @@ class PdfContext:
 
     options: Namespace  #: The specified options for processing this PDF.
     origin: Path  #: The filename of the original input file.
+    hocr_in: Path
     pdfinfo: PdfInfo  #: Detailed data for this PDF.
     plugin_manager: PluginManager  #: PluginManager for processing the current PDF.
 
@@ -40,6 +41,8 @@ class PdfContext:
         self.origin = origin
         self.pdfinfo = pdfinfo
         self.plugin_manager = plugin_manager
+        if self.options.hocr_in:
+            self.hocr_in = work_folder / 'hocr'
 
     def get_path(self, name: str) -> Path:
         """Generate a ``Path`` for an intermediate file involved in processing.
@@ -68,6 +71,7 @@ class PageContext:
     pageno: int  #: This page number (zero-based).
     pageinfo: PageInfo  #: Information on this page.
     plugin_manager: PluginManager  #: PluginManager for processing the current PDF.
+    hocr_in: Path
 
     def __init__(self, pdf_context: PdfContext, pageno):
         self.work_folder = pdf_context.work_folder
@@ -76,6 +80,7 @@ class PageContext:
         self.pageno = pageno
         self.pageinfo = pdf_context.pdfinfo[pageno]
         self.plugin_manager = pdf_context.plugin_manager
+        self.hocr_in = pdf_context.options.hocr_in
 
     def get_path(self, name: str) -> Path:
         """Generate a ``Path`` for a file that is part of processing this page.

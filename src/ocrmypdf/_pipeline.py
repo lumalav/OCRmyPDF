@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from shutil import copyfileobj
 from typing import Any, BinaryIO, Iterable, Sequence, cast
+from xml.etree.ElementTree import tostring
 
 import img2pdf
 import pikepdf
@@ -605,7 +606,9 @@ def create_ocr_image(image: Path, page_context: PageContext) -> Path:
 
 def ocr_engine_hocr(input_file: Path, page_context: PageContext) -> tuple[Path, Path]:
     hocr_out = page_context.get_path('ocr_hocr.hocr')
+    tsv_out = page_context.get_path('ocr_hocr.tsv')
     hocr_text_out = page_context.get_path('ocr_hocr.txt')
+    ocr_image = page_context.get_path('ocr.png')
     options = page_context.options
 
     ocr_engine = page_context.plugin_manager.hook.get_ocr_engine()
@@ -615,7 +618,7 @@ def ocr_engine_hocr(input_file: Path, page_context: PageContext) -> tuple[Path, 
         output_text=hocr_text_out,
         options=options,
     )
-    return (hocr_out, hocr_text_out)
+    return (hocr_out, hocr_text_out, ocr_image, tsv_out)
 
 
 def should_visible_page_image_use_jpg(pageinfo: PageInfo) -> bool:
@@ -686,7 +689,7 @@ def create_pdf_page_from_image(
     return output_file
 
 
-def render_hocr_page(hocr: Path, page_context: PageContext) -> Path:
+def render_hocr_page(hocr: Path, page_context: PageContext, image_filename: Path | None = None) -> Path:
     options = page_context.options
     output_file = page_context.get_path('ocr_hocr.pdf')
     dpi = get_page_square_dpi(page_context.pageinfo, options)
@@ -695,7 +698,7 @@ def render_hocr_page(hocr: Path, page_context: PageContext) -> Path:
     hocrtransform = HocrTransform(hocr_filename=hocr, dpi=dpi.x)  # square
     hocrtransform.to_pdf(
         out_filename=output_file,
-        image_filename=None,
+        image_filename=image_filename,
         show_bounding_boxes=False if not debug_mode else True,
         invisible_text=True if not debug_mode else False,
         interword_spaces=True,
@@ -956,19 +959,19 @@ def enumerate_compress_ranges(iterable):
         yield (skipped_from, index), None
 
 
-def merge_sidecars(txt_files: Iterable[Path | None], context: PdfContext) -> Path:
-    output_file = context.get_path('sidecar.txt')
-    with open(output_file, 'w', encoding="utf-8") as stream:
+def merge_extra_files(txt_files: Iterable[Path | None], context: PdfContext, filename: str, encoding: str | None = 'utf-8') -> Path:
+    output_file = context.get_path(filename)
+    with open(output_file, 'wb' if encoding is None else 'w', encoding=encoding) as stream:
         for (from_, to_), txt_file in enumerate_compress_ranges(txt_files):
             if from_ != 1:
                 stream.write('\f')  # Form feed between pages
             if txt_file:
-                with open(txt_file, encoding="utf-8") as in_:
+                with open(txt_file, encoding=encoding) if not encoding is None else open(txt_file, 'rb') as in_:
                     txt = in_.read()
                     # Some OCR engines (e.g. Tesseract v4 alpha) add form feeds
                     # between pages, and some do not. For consistency, we ignore
                     # any added by the OCR engine and them on our own.
-                    if txt.endswith('\f'):
+                    if not encoding is None and txt.endswith('\f'):
                         stream.write(txt[:-1])
                     else:
                         stream.write(txt)
@@ -980,6 +983,16 @@ def merge_sidecars(txt_files: Iterable[Path | None], context: PdfContext) -> Pat
                 stream.write(f'[OCR skipped on page(s) {pages}]')
     return output_file
 
+def replace_image_in_hocr(hocr_file:  str | Path | BinaryIO, image_location: str) -> None:
+    import lxml.html
+    xpath = '/html/body/div[@class=\'ocr_page\']'
+    document = lxml.html.parse(hocr_file)
+    elements = document.xpath(xpath)
+    div = elements[0]
+    curr_title_vals = div.attrib['title'].split(';')[1:]
+    div.attrib['title'] = 'image \'' + image_location + '\';' + ";".join(curr_title_vals)
+    with open(hocr_file, 'wb') as f:
+        f.write(tostring(document.getroot(), 'utf-8', xml_declaration=True, short_empty_elements=False))
 
 def copy_final(
     input_file: Path, output_file: str | Path | BinaryIO, _context: PdfContext

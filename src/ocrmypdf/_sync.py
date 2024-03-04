@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import argparse
 import logging
 import logging.handlers
@@ -29,6 +30,7 @@ from ocrmypdf._logging import PageNumberFilter
 from ocrmypdf._pipeline import (
     convert_to_pdfa,
     copy_final,
+    replace_image_in_hocr,
     create_ocr_image,
     create_pdf_page_from_image,
     create_visible_page_jpg,
@@ -36,7 +38,7 @@ from ocrmypdf._pipeline import (
     get_orientation_correction,
     get_pdfinfo,
     is_ocr_required,
-    merge_sidecars,
+    merge_extra_files,
     metadata_fixup,
     ocr_engine_hocr,
     ocr_engine_textonly_pdf,
@@ -78,6 +80,9 @@ class PageResult(NamedTuple):
     ocr: Path | None
     text: Path | None
     orientation_correction: int
+    hocr: Path | None
+    ocr_image: Path | None
+    tsv: Path | None
 
 
 tls = threading.local()
@@ -184,7 +189,7 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
             text=None,
             orientation_correction=0,
         )
-
+    
     orientation_correction = 0
     if options.rotate_pages:
         # Rasterize
@@ -213,11 +218,23 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
             visible_image_out, page_context, orientation_correction
         )
 
+    ocr_out: Path = None
+    text_out: Path = None
+    ocr_image: Path = None
+    tsv_out: Path = None
+
     if options.pdf_renderer.startswith('hocr'):
-        (hocr_out, text_out) = ocr_engine_hocr(ocr_image_out, page_context)
-        ocr_out = render_hocr_page(hocr_out, page_context)
+        if not page_context.hocr_in:
+            (hocr_out, text_out, ocr_image, tsv_out) = ocr_engine_hocr(ocr_image_out, page_context)
+        if page_context.hocr_in:
+            ocr_image = page_context.get_path('ocr.png')
+            hocr_out = page_context.hocr_in
+            ocr_out = render_hocr_page(hocr_out, page_context, ocr_image)
+        elif not options.ocr_only:
+            ocr_out = render_hocr_page(hocr_out, page_context)
     elif options.pdf_renderer == 'sandwich':
-        (ocr_out, text_out) = ocr_engine_textonly_pdf(ocr_image_out, page_context)
+        if not options.ocr_only:
+            (ocr_out, text_out) = ocr_engine_textonly_pdf(ocr_image_out, page_context)
     else:
         raise NotImplementedError(f"pdf_renderer {options.pdf_renderer}")
 
@@ -225,8 +242,11 @@ def exec_page_sync(page_context: PageContext) -> PageResult:
         pageno=page_context.pageno,
         pdf_page_from_image=pdf_page_from_image_out,
         ocr=ocr_out,
+        hocr=hocr_out,
         text=text_out,
         orientation_correction=orientation_correction,
+        ocr_image=ocr_image,
+        tsv=tsv_out
     )
 
 
@@ -259,12 +279,18 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
         log.info("Start processing %d pages concurrently", max_workers)
 
     sidecars: list[Path | None] = [None] * len(context.pdfinfo)
+    hocrs: list[Path | None] = [None] * len(context.pdfinfo)
+    tsvs: list[Path | None] = [None] * len(context.pdfinfo)
+    ocr_images: list[Path | None] = [None] * len(context.pdfinfo)
     ocrgraft = OcrGrafter(context)
 
     def update_page(result: PageResult, pbar):
         try:
             tls.pageno = result.pageno + 1
             sidecars[result.pageno] = result.text
+            hocrs[result.pageno] = result.hocr
+            tsvs[result.pageno] = result.tsv
+            ocr_images[result.pageno] = result.ocr_image
             pbar.update()
             ocrgraft.graft_page(
                 pageno=result.pageno,
@@ -294,14 +320,38 @@ def exec_concurrent(context: PdfContext, executor: Executor) -> Sequence[str]:
 
     # Output sidecar text
     if options.sidecar:
-        text = merge_sidecars(sidecars, context)
+        text = merge_extra_files(sidecars, context, 'sidecar.txt')
         # Copy text file to destination
         copy_final(text, options.sidecar, context)
+
+    if options.hocr_out:
+        #copy hocr to final location
+        text = merge_extra_files(hocrs, context, 'hocr.txt')
+        copy_final(text, options.hocr_out, context)
+
+        #copy image to final location
+        out_path = Path(options.hocr_out)
+        ext = out_path.suffix
+        parent = out_path.parent.absolute()
+        filename = out_path.name.replace(ext,'.png') if ext else out_path.name + '.png'
+        final_image_location = parent.joinpath(filename).absolute()
+        text = merge_extra_files(ocr_images, context, filename, None)
+        copy_final(text, final_image_location, context)
+
+        replace_image_in_hocr(options.hocr_out, filename)
+    
+    if options.tsv_out:
+        text = merge_extra_files(tsvs, context, 'hocr.tsv')
+        copy_final(text, options.tsv_out, context)
+
+    messages: Sequence[str] = []
+
+    if options.ocr_only:
+        return messages
 
     # Merge layers to one single pdf
     pdf = ocrgraft.finalize()
 
-    messages: Sequence[str] = []
     if options.output_type != 'none':
         # PDF/A and metadata
         log.info("Postprocessing...")
@@ -389,6 +439,10 @@ def run_pipeline(
 
         # Execute the pipeline
         optimize_messages = exec_concurrent(context, executor)
+
+        if options.ocr_only:
+            log.info('--ocr-only was performed to the file')
+            return ExitCode.ok
 
         if options.output_file == '-':
             log.info("Output sent to stdout")

@@ -117,18 +117,18 @@ def check_options_output(options: Namespace) -> None:
         )
 
 
-def check_options_sidecar(options: Namespace) -> None:
-    if options.sidecar == '\0':
+def check_options_extra_files(options: Namespace, property: str) -> None:
+    if options.__dict__[property] == '\0':
         if options.output_file == '-':
-            raise BadArgsError("--sidecar filename needed when output file is stdout.")
+            raise BadArgsError(f"--{property} filename needed when output file is stdout.")
         elif options.output_file == os.devnull:
             raise BadArgsError(
-                "--sidecar filename needed when output file is /dev/null or NUL."
+                f"--{property} filename needed when output file is /dev/null or NUL."
             )
-        options.sidecar = options.output_file + '.txt'
-    if options.sidecar == options.input_file or options.sidecar == options.output_file:
+        options.__dict__[property] = options.output_file + ('.txt' if property == 'sidecar' else '.hocr')
+    if options.__dict__[property] == options.input_file or options.__dict__[property] == options.output_file:
         raise BadArgsError(
-            "--sidecar file must be different from the input and output files"
+            f"--{property} file must be different from the input and output files"
         )
 
 
@@ -203,6 +203,11 @@ def check_options_ocr_behavior(options: Namespace) -> None:
     if options.pages:
         options.pages = _pages_from_ranges(options.pages)
 
+def check_options_hocr(options: Namespace) -> None:
+    if options.hocr_in and options.ocr_only:
+        raise BadArgsError("An hocr file is being passed to generate the final file. But, ocr-only is set as well.")
+    if not options.pdf_renderer.startswith('hocr') and options.hocr_out:
+        raise BadArgsError("To be able to output the hocr file, the pdf-renderer must be set to hocr.")
 
 def check_options_advanced(options: Namespace) -> None:
     if options.pdfa_image_compression != 'auto' and not options.output_type.startswith(
@@ -237,9 +242,11 @@ def _check_plugin_invariant_options(options: Namespace) -> None:
     check_platform()
     check_options_metadata(options)
     check_options_output(options)
-    check_options_sidecar(options)
+    check_options_extra_files(options, 'sidecar')
+    check_options_extra_files(options, 'hocr_out')
     check_options_preprocessing(options)
     check_options_ocr_behavior(options)
+    check_options_hocr(options)
     check_options_advanced(options)
     check_options_pillow(options)
 
@@ -256,6 +263,8 @@ def check_options(options: Namespace, plugin_manager: PluginManager) -> None:
 
 
 def create_input_file(options: Namespace, work_folder: Path) -> tuple[Path, str]:
+    if options.hocr_in:
+        safe_symlink(options.hocr_in, work_folder / 'hocr')
     if options.input_file == '-':
         # stdin
         log.info('reading file from standard input')

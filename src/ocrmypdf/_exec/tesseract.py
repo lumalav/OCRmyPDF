@@ -328,7 +328,7 @@ def generate_hocr(
 
     # Reminder: test suite tesseract test plugins will break after any changes
     # to the number of order parameters here
-    args_tesseract.extend([fspath(input_file), fspath(prefix), 'hocr', 'txt'])
+    args_tesseract.extend([fspath(input_file), fspath(prefix), 'hocr', 'txt', 'tsv'])
     args_tesseract.extend(tessconfig)
     try:
         p = run(args_tesseract, stdout=PIPE, stderr=STDOUT, timeout=timeout, check=True)
